@@ -1,7 +1,11 @@
 import express from 'express';
 import { config } from 'dotenv';
 import http from 'http';
+import { Server } from 'socket.io';
+import { PrismaClient } from '@prisma/client';
+import { data } from 'react-router';
 
+const prisma = new PrismaClient();
 
 // load environment variables
 config();
@@ -12,6 +16,7 @@ const app = express();
 // we wrap the express app in a node http server so that we can
 // expose the server to socket.io later on.
 const server = http.createServer(app);
+const io = new Server(server);
 const port = parseInt(process.env.PORT || '3000');
 
 
@@ -29,7 +34,63 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/', (req, res) => {
+app.post('/api/count', async (req, res) => {
+  const count = await prisma.count.findFirst({
+    where: {
+      id: 1
+    }
+  });
+  if (count) {
+    await prisma.count.update({
+      where: {
+        id: 1
+      },
+      data: {
+        value: count.value + 1
+      }
+    });
+    res.json({ value: count.value + 1 });
+  } else {
+    await prisma.count.create({
+      data: {
+        value: 1
+      }
+    });
+    res.json({ value: 1 });
+  }
+});
+
+app.get("/api/count", async (req, res) => {
+  const count = await prisma.count.findFirst({
+    where: {
+      id: 1
+    }
+  });
+  if (count) {
+    res.json({ value: count.value });
+  } else {
+    res.json({ value: 0 });
+  }
+});
+
+io.on('connection', (socket) => {
+  console.log('a user connected');
+
+  socket.on('message', (message) => {
+    console.log('message received:', message);
+    io.emit('message', message);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('user disconnected');
+  });
+});
+
+server.listen(port, () => {
+  console.log(`Server is running on http://localhost:${port}`);
+});
+
+app.get('*', (req, res) => {
   res.send(`
     <!doctype html>
     <html lang="en">
@@ -55,6 +116,3 @@ app.get('/', (req, res) => {
     `);
 });
 
-server.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
-});

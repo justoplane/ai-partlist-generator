@@ -13,3 +13,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Count {
+  id    Int    @id @default(autoincrement())
+  value Int
+}
